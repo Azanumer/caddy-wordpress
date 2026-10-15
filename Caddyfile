@@ -1,0 +1,53 @@
+# Caddy v2 site block for WordPress with automatic HTTPS (Let's Encrypt).
+# Drop into /etc/caddy/Caddyfile, replace example.com, then: systemctl reload caddy
+#
+# Requirements: PHP-FPM listening on a unix socket (adjust the socket path),
+# WordPress extracted under the document root.
+
+example.com {
+	root * /var/www/wordpress
+
+	# Compression
+	encode gzip zstd
+
+	# Pretty permalinks: let WordPress handle non-file requests
+	try_files {path} {path}/ /index.php?{query}
+
+	# PHP
+	php_fastcgi unix//run/php/php8.2-fpm.sock
+
+	file_server
+
+	# Never serve these, no matter what
+	@blocked {
+		path /wp-config.php /xmlrpc.php /readme.html /license.txt
+		path_regexp /\.(git|svn|env|sql|bak|log)$
+	}
+	respond @blocked 404
+
+	# Long cache for fingerprinted static assets (themes/plugins append ?ver=…)
+	@static {
+		path *.css *.js *.jpg *.jpeg *.png *.gif *.webp *.svg *.woff *.woff2 *.ico
+	}
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	# No cache for the admin area, login or the REST API
+	@dynamic {
+		path /wp-admin/* /wp-login.php /wp-cron.php /xmlrpc.php /wp-json/*
+	}
+	header @dynamic Cache-Control "no-store"
+
+	# Security headers (adjust CSP if you use inline scripts)
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# Optional: serve www -> apex or the other way round
+	# www.example.com {
+	# 	redir https://example.com{uri} permanent
+	# }
+}
