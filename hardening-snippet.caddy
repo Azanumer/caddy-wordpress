@@ -1,0 +1,16 @@
+# Optional hardening snippet for the WordPress site block above.
+# Import it inside your site block with: import hardening-snippet.caddy
+
+# Hide Caddy version banner is already handled with `-Server`; this snippet adds:
+#  - rate limiting on wp-login.php (basic brute-force throttle)
+#  - block of known-bad user agents handled by Caddy's expression matcher
+
+@wp_login {
+	path /wp-login.php
+}
+rate_limit @wp_login 10r/m 20 burst
+
+@badbots {
+	header_regexp User-Agent (?i)(sqlmap|nikto|acunetix|masscan|hydra|nmap|zgrab)
+}
+respond @badbots 403
