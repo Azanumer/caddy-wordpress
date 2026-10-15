@@ -1,0 +1,42 @@
+# Caddyfile for the docker-compose stack in this folder.
+# Caddy proxies PHP to the wordpress container and serves static files itself.
+{
+	email admin@example.com   # used for Let's Encrypt account
+}
+
+example.com {
+	root * /var/www/html
+
+	encode gzip zstd
+
+	# WordPress permalinks
+	try_files {path} {path}/ /index.php?{query}
+
+	# php_fastcgi against the wordpress container (port 9000)
+	php_fastcgi wordpress:9000
+
+	file_server
+
+	@blocked {
+		path /wp-config.php /xmlrpc.php /readme.html /license.txt
+		path_regexp /\.(git|svn|env|sql|bak|log)$
+	}
+	respond @blocked 404
+
+	@static {
+		path *.css *.js *.jpg *.jpeg *.png *.gif *.webp *.svg *.woff *.woff2 *.ico
+	}
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	@dynamic {
+		path /wp-admin/* /wp-login.php /wp-cron.php /xmlrpc.php /wp-json/*
+	}
+	header @dynamic Cache-Control "no-store"
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
